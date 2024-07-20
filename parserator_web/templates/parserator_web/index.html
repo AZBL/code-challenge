@@ -16,6 +16,7 @@
           <input name="address" type="text" class="form-control" id="address" placeholder="123 Main St. Suite 100 Chicago, IL">
           <button id="submit" type="submit" class="btn btn-success mt-3">Parse!</button>
         </form>
+        <div id="error-message" class="mt-3 text-danger" style="display:none;"></div>
       </div>
       <!-- TODO: Display parsed address components here. -->
       <div id="address-results" style="display:none">
@@ -39,4 +40,67 @@
 
 {% block extra_js %}
   <script src="{% static 'js/index.js' %}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        const addressInput = document.getElementById('address');
+        const resultsDiv = document.getElementById('address-results');
+        const parseTypeSpan = document.getElementById('parse-type');
+        const resultsTableBody = resultsDiv.querySelector('tbody');
+        const errorMessageDiv = document.getElementById('error-message');
+
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const address = addressInput.value;
+            const url = '/api/parse/'; 
+
+            fetch(url + '?address=' + encodeURIComponent(address), {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || 'Unknown error');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                resultsTableBody.innerHTML = '';
+                errorMessageDiv.style.display = 'none';
+                errorMessageDiv.textContent = '';
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                parseTypeSpan.textContent = data.address_type;
+
+                Object.keys(data.address_components).forEach(key => {
+                    const row = document.createElement('tr');
+                    const partCell = document.createElement('td');
+                    partCell.textContent = key;
+                    const tagCell = document.createElement('td');
+                    tagCell.textContent = data.address_components[key];
+                    row.appendChild(partCell);
+                    row.appendChild(tagCell);
+                    resultsTableBody.appendChild(row);
+                });
+
+                resultsDiv.style.display = 'block';
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+
+                const errorMessage = error.message.split("ORIGINAL STRING")[0].trim();
+                errorMessageDiv.textContent = 'Error: ' + errorMessage;
+                errorMessageDiv.style.display = 'block';
+            });
+        });
+    });
+  </script>
 {% endblock %}
